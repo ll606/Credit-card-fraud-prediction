@@ -1,0 +1,98 @@
+print('importing modules...')
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn import metrics as km
+import matplotlib.pyplot as plt
+from keras import models
+from keras import layers
+from tensorflow.keras import optimizers
+from keras import losses
+from keras import metrics
+from time import time
+import xlrd
+
+def main():
+	print('importing modules Complete!\n')
+	t0 = time()
+	print('loading data...')
+	data = pd.read_csv('credit card.csv')
+	targets = data['Class']
+	data.drop(columns=['Class'],inplace=True)
+
+	t0 = time()
+	data = np.array(data)
+
+	x_train,x_test,y_train,y_test = train_test_split(data,targets,random_state=15,test_size=0.2)
+
+	partial_x_train,x_train_val,partial_y_train,y_train_val = train_test_split(x_train,y_train,test_size=0.2)
+
+	x_train = np.asarray(x_train).astype('float32')
+	x_test = np.asarray(x_test).astype('float32')
+	y_train = np.asarray(y_train).astype('float32')
+	y_test= np.asarray(y_test).astype('float32')
+	partial_x_train = np.asarray(partial_x_train).astype('float32')
+	partial_y_train = np.asarray(partial_y_train).astype('float32')
+	x_train_val = np.asarray(x_train_val).astype('float32')
+	y_train_val = np.asarray(y_train_val).astype('float32')
+	print(len(partial_x_train),len(partial_y_train))
+
+
+	print(f'Preprocessing Complete! ({round(time()-t0,2)})\n')
+
+	print('Establishing model...')
+	t0 = time()
+	model = models.Sequential()
+	model.add(layers.Dense(512,activation='relu',input_shape=(len(data[0]),)))
+	model.add(layers.Dropout(0.2))
+	model.add(layers.Dense(512,activation='relu'))
+	model.add(layers.Dropout(0.2))
+	model.add(layers.Dense(512,activation='relu'))
+	model.add(layers.Dropout(0.2))
+	model.add(layers.Dense(1,activation='sigmoid'))
+
+	model.compile(
+	optimizer=optimizers.RMSprop(lr=0.001),
+	loss=losses.binary_crossentropy,
+	metrics=['acc']
+	)
+
+	print(f'Model Establishing Complete! ({round(time()-t0,2)})\n')
+
+	print('Training model...')
+
+	history = model.fit(partial_x_train,partial_y_train,
+	epochs=20,batch_size=512,
+	validation_data=(x_train_val,y_train_val))
+	print('Trainingmodel Complete!')
+
+	print('Evaluating model...')
+	results = model.evaluate(x_test,y_test)
+	print(results)
+	res = model.predict(x_test)
+	res = res.flatten()
+	model_fpr,model_tpr,threshold = km.roc_curve(y_test,res)
+	km.RocCurveDisplay.from_predictions(y_test,res)
+	print('Prediction:')
+	for each in res:print(each)
+	print('\n\n\n')
+	print('True Results:')
+	for each in y_test:print(each)
+	roc_auc = km.auc(model_fpr,model_tpr)
+	plt = roc_plot(model_fpr,model_tpr,roc_auc)
+	plt.show()
+
+	loss = history.history['loss']
+	val_loss = history.history['val_loss']
+
+	epochs = range(1,len(loss)+1)
+	plt.plot(epochs, loss, 'bo', label='Training loss')
+	plt.plot(epochs, val_loss, 'b', label='Validation loss')
+	plt.title('Training and validation loss')
+	plt.xlabel('Epochs')
+	plt.ylabel('Loss')
+	plt.legend()
+	plt.show()
+
+if __name__ == '__main__':
+	main()
